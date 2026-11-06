@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bingo Classificado Carro</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: marketplace grid of car ads on the left (click one to expand it across the row), bingo card + scoreboard on the right; stacks on phones with the card first. */
+:root {
+  --bg: #e9ecef;
+  --surface: #ffffff;
+  --sunk: #f3f5f7;
+  --fg: #1a1e23;
+  --muted: #5d6670;
+  --line: #d3d8de;
+  --accent: #f2c230;
+  --accent-ink: #1a1e23;
+  --plate: #1f4ba5;
+  --good: #1f8a4c;
+  --bad: #c2362b;
+  --found-bg: #fbe58f;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14171b; --surface: #1e2329; --sunk: #181c21; --fg: #eceff2; --muted: #9aa3ad;
+    --line: #2f363e; --accent: #f2c230; --accent-ink: #14171b; --plate: #5b86e0;
+    --good: #4cc27f; --bad: #ff7a6e; --found-bg: #5a4a10; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14171b; --surface: #1e2329; --sunk: #181c21; --fg: #eceff2; --muted: #9aa3ad;
+  --line: #2f363e; --accent: #f2c230; --accent-ink: #14171b; --plate: #5b86e0;
+  --good: #4cc27f; --bad: #ff7a6e; --found-bg: #5a4a10; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, .w:focus-visible, .item:focus-visible { outline: 3px solid var(--plate); outline-offset: 2px; }
+.wrap { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; }
+.brand h1 {
+  font-family: var(--display); font-weight: 900; font-stretch: 125%; font-size: clamp(24px, 4.6vw, 40px);
+  line-height: 1; margin: 0; letter-spacing: -0.01em; text-transform: uppercase; text-wrap: balance;
+}
+.brand h1 span { background: var(--accent); color: var(--accent-ink); padding: 0 .18em; }
+.brand p { margin: 8px 0 0; color: var(--muted); max-width: 62ch; }
+.levels { display: flex; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
+.levels button {
+  border: 0; background: transparent; padding: 8px 14px; border-radius: 7px;
+  font-family: var(--display); font-weight: 700; font-size: 14px; letter-spacing: .02em;
+}
+.levels button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.levels small { display: block; font-family: var(--body); font-weight: 500; font-size: 11px; opacity: .7; letter-spacing: 0; }
+
+.game { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .game { grid-template-columns: minmax(0, 1fr); } .side { order: -1; } }
+
+/* Feed */
+.feed { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.feed-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; }
+.feed-head h2 { margin: 0; font-family: var(--display); font-weight: 800; font-size: 20px; }
+.feed-head span { color: var(--muted); font-size: 13px; }
+.list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; grid-auto-flow: dense; }
+.item {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+  display: flex; flex-direction: column; cursor: pointer; text-align: left; padding: 0; min-width: 0; position: relative;
+  transition: border-color .15s, transform .15s;
+}
+.item:hover { border-color: var(--muted); }
+.thumb { position: relative; aspect-ratio: 4 / 3; max-width: 100%; display: grid; place-items: center; overflow: hidden; }
+.thumb svg { width: 78%; height: auto; }
+.badge {
+  position: absolute; top: 8px; right: 8px; background: var(--accent); color: var(--accent-ink);
+  font-weight: 700; font-size: 12px; border-radius: 999px; padding: 2px 9px;
+}
+.info { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.price { font-family: var(--display); font-weight: 900; font-size: 19px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.title { font-weight: 600; font-size: 14px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.meta { color: var(--muted); font-size: 12px; font-family: var(--mono); }
+.city { color: var(--muted); font-size: 12px; }
+
+/* Expanded ad */
+.item.open { grid-column: 1 / -1; cursor: default; flex-direction: row; border: 2px solid var(--fg); }
+.item.open .thumb { flex: 0 0 min(40%, 340px); aspect-ratio: auto; min-height: 240px; }
+.item.open .info { padding: 18px 20px 20px; gap: 8px; flex: 1; }
+.item.open .price { font-size: 28px; }
+.item.open .title { font-family: var(--display); font-stretch: 85%; font-weight: 800; font-size: 22px; -webkit-line-clamp: unset; }
+.item.open .meta, .item.open .city { font-size: 13px; }
+@media (max-width: 640px) { .item.open { flex-direction: column; } .item.open .thumb { flex: none; aspect-ratio: 16 / 9; min-height: 0; } }
+.plate {
+  position: absolute; top: 10px; left: 10px; background: #fff; color: #111; border: 2px solid #111; border-radius: 5px;
+  font-family: var(--mono); font-weight: 600; font-size: 12px; letter-spacing: .12em; overflow: hidden; text-align: center;
+}
+.plate b { display: block; background: #1f4ba5; color: #fff; font-family: var(--body); font-size: 7px; letter-spacing: .2em; padding: 1px 0; }
+.plate span { display: block; padding: 1px 7px; }
+.item:not(.open) .plate { display: none; }
+.desc-label { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; margin-top: 6px; }
+.desc { font-size: 17px; line-height: 1.75; margin: 0; max-width: 64ch; }
+.close { align-self: flex-start; margin-top: 6px; background: var(--sunk); border: 1px solid var(--line); border-radius: 8px; padding: 7px 14px; font-weight: 600; }
+.w { cursor: pointer; border-radius: 3px; transition: background .12s; }
+.w:hover { background: var(--sunk); box-shadow: inset 0 -2px 0 var(--line); }
+.occ.found .w { background: var(--found-bg); box-shadow: none; }
+.occ.found.off .w { background: transparent; box-shadow: inset 0 -2px 0 var(--muted); }
+.reveal .occ:not(.found) .w { box-shadow: inset 0 -2px 0 var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.w.miss { animation: shake .35s; color: var(--bad); }
+@keyframes shake { 0%,100% { transform: none; } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+@media (prefers-reduced-motion: reduce) { .w.miss { animation: none; } * { transition: none !important; } }
+
+/* Side */
+.side { display: flex; flex-direction: column; gap: 14px; position: sticky; top: max(12px, env(safe-area-inset-top, 0px)); min-width: 0; }
+@media (max-width: 900px) { .side { position: static; } }
+.score { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.stat label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; }
+.stat output { display: block; font-family: var(--display); font-weight: 900; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat.warn output { color: var(--bad); }
+.card { background: var(--fg); color: var(--bg); border-radius: 12px; padding: 12px; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; padding: 2px 4px 10px; }
+.card-head strong { font-family: var(--display); font-stretch: 125%; font-weight: 900; font-size: 18px; letter-spacing: .04em; text-transform: uppercase; }
+.card-head span { font-size: 12px; opacity: .75; font-variant-numeric: tabular-nums; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.sq {
+  background: var(--surface); color: var(--fg); border-radius: 6px; min-height: 78px; padding: 8px;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  font-family: var(--display); font-stretch: 80%; font-weight: 700; font-size: 14px; line-height: 1.15; position: relative;
+}
+.sq.on { background: var(--accent); color: var(--accent-ink); }
+.sq.on::after { content: ""; position: absolute; inset: 10px; border: 3px solid var(--accent-ink); border-radius: 50%; opacity: .55; transform: rotate(-8deg); }
+.sq.line { box-shadow: inset 0 0 0 3px var(--plate); }
+.hint { color: var(--muted); font-size: 13px; margin: 0; }
+.toast { min-height: 44px; display: flex; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-weight: 600; font-size: 14px; }
+.toast.good { border-color: var(--good); color: var(--good); }
+.toast.bad { border-color: var(--bad); color: var(--bad); }
+.toast.big { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-family: var(--display); font-weight: 900; font-size: 18px; }
+.end { background: var(--surface); border: 2px solid var(--fg); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.end h2 { font-family: var(--display); font-stretch: 110%; font-weight: 900; margin: 0; font-size: 22px; text-transform: uppercase; }
+.end p { margin: 0; color: var(--muted); }
+.end .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 700; background: var(--fg); color: var(--bg); }
+.btn.alt { background: var(--sunk); color: var(--fg); border: 1px solid var(--line); }
+footer { color: var(--muted); font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Bingo <span>Classificado</span> Carro</h1>
+      <p>Abra os anúncios e clique nas frases clichê que estão na sua cartela. Frase mais escondida vale mais ponto. Errou o clique, perde ponto. Fechou uma linha, é bingo.</p>
+    </div>
+    <div class="levels" role="group" aria-label="Nível">
+      <button id="lv-facil" data-lv="facil" aria-pressed="true">FÁCIL<small>6 min · erro −1</small></button>
+      <button id="lv-medio" data-lv="medio" aria-pressed="false">MÉDIO<small>4 min · erro −3</small></button>
+      <button id="lv-dificil" data-lv="dificil" aria-pressed="false">DIFÍCIL<small>2:30 · erro −5</small></button>
+    </div>
+  </header>
+
+  <div class="game">
+    <section class="feed">
+      <div class="feed-head">
+        <h2>Carros à venda</h2>
+        <span id="feed-count"></span>
+      </div>
+      <div class="list" id="list"></div>
+    </section>
+
+    <aside class="side">
+      <div class="score">
+        <div class="stat"><label>Pontos</label><output id="score">0</output></div>
+        <div class="stat" id="timer-box"><label>Tempo</label><output id="timer">6:00</output></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><strong>Cartela</strong><span id="card-count">0 de 9</span></div>
+        <div class="grid" id="grid"></div>
+      </div>
+      <div class="toast" id="toast">Clique num anúncio para abrir. O tempo começa quando você abrir o primeiro.</div>
+      <div class="end" id="end" hidden>
+        <h2 id="end-title">Fim de jogo</h2>
+        <p id="end-text"></p>
+        <div class="row">
+          <button class="btn" id="again">Jogar de novo</button>
+          <button class="btn alt" id="reveal">Mostrar o que faltou</button>
+        </div>
+      </div>
+      <p class="hint">Vale clicar em qualquer palavra da frase. Frase escrita certinha vale 10, com erro ou gíria vale 20, disfarçada vale 30. Clichê fora da cartela não tira ponto.</p>
+    </aside>
+  </div>
+
+  <footer>Anúncios fictícios, escritos no estilo dos classificados de carro brasileiros.</footer>
+</div>
+
+<script>
+const PH = {
+  leia: "Leia o anúncio até o final", unico: "Único dono", nada: "Nada pra fazer, só rodar", ipva: "IPVA pago",
+  troca: "Não aceito troca", curiosos: "Curiosos, não chamem", motor: "Motor 100%", revisado: "Revisado",
+  fipe: "Abaixo da FIPE", urgente: "Vendo por motivo de viagem", oi: "Tá anunciado, tá disponível",
+  garagem: "Carro de garagem", pneus: "Pneus novos", laudo: "Laudo cautelar aprovado", menor: "Menor preço da região",
+  ar: "Ar gelando", semdetalhe: "Sem nenhum detalhe", moto: "Pego moto no negócio", zap: "Chama no zap",
+  leilao: "Sem leilão, sem sinistro"
+};
+const LV = {
+  facil: { name: "Fácil", time: 360, miss: 1 },
+  medio: { name: "Médio", time: 240, miss: 3 },
+  dificil: { name: "Difícil", time: 150, miss: 5 }
+};
+const PTS = { 1: 10, 2: 20, 3: 30 };
+const TIER = { 1: "certinha", 2: "com erro", 3: "disfarçada" };
+// n = how hidden the phrases in this ad are (1 written plainly, 2 typos/slang, 3 disguised)
+const ADS = [
+  { n: 1, t: "Honda Civic EXL 2.0 Flex", y: "2018", km: "72.000", city: "Campinas, SP", p: "R$ 98.900", plate: "FTR4C21", c: "#9aa4ad",
+    d: "Vendo Civic EXL top de linha. {unico:Único dono}, {revisado:revisado na concessionária}, todas as notas guardadas. {ipva:IPVA 2026 pago}. {nada:Nada pra fazer, só rodar}. {leia:Leia o anúncio até o final} antes de chamar. {troca:Não aceito troca}." },
+  { n: 1, t: "Volkswagen Gol 1.0 MPI", y: "2014", km: "118.000", city: "Belo Horizonte, MG", p: "R$ 32.500", plate: "HKL2B07", c: "#c0392b",
+    d: "Gol 1.0 completo, {ar:ar gelando}, direção hidráulica e vidro elétrico. {pneus:Pneus novos}. {motor:Motor 100%}, nunca foi aberto. {curiosos:Curiosos, favor não chamar}. {zap:Chama no zap} que respondo rápido." },
+  { n: 1, t: "Fiat Strada Freedom 1.3 Cabine Dupla", y: "2021", km: "54.000", city: "Goiânia, GO", p: "R$ 89.990", plate: "PQA7D44", c: "#e8e8e3",
+    d: "Strada cabine dupla impecável. {garagem:Carro de garagem}, {semdetalhe:sem nenhum detalhe}. {laudo:Laudo cautelar aprovado}. {fipe:Abaixo da FIPE} para vender rápido. {leia:Leia o anúncio até o final}, não faço por menos." },
+  { n: 1, t: "Chevrolet Onix LT 1.0", y: "2019", km: "81.000", city: "Curitiba, PR", p: "R$ 58.000", plate: "BCX9E12", c: "#2b2f36",
+    d: "Onix LT com manual e chave reserva. {unico:Único dono}. {leilao:Sem leilão e sem sinistro}. {ipva:IPVA pago}. {urgente:Vendo por motivo de viagem}. {moto:Pego moto no negócio}." },
+  { n: 1, t: "Toyota Corolla XEi 2.0 Automático", y: "2017", km: "96.000", city: "Recife, PE", p: "R$ 92.000", plate: "KGF3A58", c: "#5b6b7a",
+    d: "Corolla XEi automático, banco de couro. {revisado:Revisado}, {pneus:pneus novos}, {ar:ar gelando}. {nada:Nada pra fazer}. {menor:Menor preço da região}. {troca:Não aceito troca} nem proposta. {zap:Chama no zap}." },
+  { n: 1, t: "Hyundai Creta Pulse 1.6 Automático", y: "2019", km: "67.000", city: "Campo Grande, MS", p: "R$ 84.900", plate: "QAB5R30", c: "#b0352f",
+    d: "Creta Pulse automático, central multimídia. {garagem:Carro de garagem}, {revisado:revisado}. {laudo:Laudo cautelar aprovado}. {urgente:Vendo por motivo de viagem}. {leia:Leia o anúncio até o final}." },
+  { n: 1, t: "Fiat Uno Vivace 1.0", y: "2015", km: "125.000", city: "Londrina, PR", p: "R$ 29.900", plate: "AYU8S14", c: "#e8e8e3",
+    d: "Uno econômico, ótimo pra trabalho e aplicativo. {nada:Nada pra fazer, só rodar}. {fipe:Abaixo da FIPE}. {curiosos:Curiosos, não chamem}. {moto:Pego moto no negócio}. {zap:Chama no zap}." },
+  { n: 1, t: "Chevrolet S10 LTZ 2.8 Diesel 4x4", y: "2017", km: "158.000", city: "Cuiabá, MT", p: "R$ 139.000", plate: "NJK2T77", c: "#3a3f45",
+    d: "S10 LTZ 4x4 diesel, capota marítima. {unico:Único dono}. {semdetalhe:Sem nenhum detalhe}. {leilao:Sem leilão, sem sinistro}. {menor:Menor preço da região}. {ipva:IPVA pago}. {troca:Não aceito troca}." },
+
+  { n: 2, t: "Hyundai HB20 Comfort 1.0", y: "2020", km: "47.000", city: "Fortaleza, CE", p: "R$ 64.900", plate: "OSA1F90", c: "#e8e8e3",
+    d: "hb20 top demais, {unico:unico dono} desde 0km. {leia:leia ate o fim pfv} q ta tudo aqui. {ipva:ipva 26 ja quitado}. {ar:ar gela mt}. {troca:nao pego troca}. {oi:nao respondo ainda tem, se ta anunciado ta disponivel}." },
+  { n: 2, t: "Renault Sandero Stepway 1.6", y: "2016", km: "103.000", city: "Salvador, BA", p: "R$ 45.000", plate: "JRT5G33", c: "#d35400",
+    d: "Stepway 1.6 muito conservada. {nada:é so pegar e andar}. {motor:motor redondinho}, nao bebe oleo. {pneus:4 pneu zero}. {curiosos:curioso e aventureiro nem chama}. {zap:me chama no whats}." },
+  { n: 2, t: "Jeep Renegade Longitude 1.8", y: "2018", km: "88.000", city: "Porto Alegre, RS", p: "R$ 79.500", plate: "IZM8H61", c: "#3d5a3a",
+    d: "Renegade longitude automatico. {revisado:revisoes em dia} tudo na rede. {garagem:dorme na garagem}. {semdetalhe:sem 1 risco}. {fipe:preco bem abaixo da tabela}. {leilao:nunca foi de leilao, nada de sinistro}. {leia:ler o anuncio todo antes de perguntar}." },
+  { n: 2, t: "Ford Ka SE 1.0", y: "2019", km: "76.000", city: "São Paulo, SP", p: "R$ 42.900", plate: "GHU4J02", c: "#2e4a8b",
+    d: "Ka SE completo. {laudo:cautelar 100% aprovada}. {urgente:preciso vender logo, mudança de cidade}. {moto:aceito moto como parte}. {menor:mais barato da regiao, pode pesquisar}. {ipva:documento ok ipva pg}." },
+  { n: 2, t: "Volkswagen Polo Highline TSI", y: "2020", km: "61.000", city: "Florianópolis, SC", p: "R$ 99.900", plate: "QWE6K75", c: "#8e9aa6",
+    d: "Polo highline tsi, {unico:1 dono so}. {ar:ar condicionado gelando}. {troca:troca nao}, so venda. {oi:ta disponivel sim, nao precisa perguntar}. {nada:nao precisa gastar 1 real}. {curiosos:so chama quem tem o dinheiro}." },
+  { n: 2, t: "Toyota Etios XS 1.5 Sedan", y: "2018", km: "84.000", city: "Natal, RN", p: "R$ 51.000", plate: "MXR3U56", c: "#8b1e2a",
+    d: "etios xs sedan, {garagem:carro de garajem}. {motor:motor top nunca deu problema}. {laudo:laudo ok aprovado}. {fipe:abaixo da fipe pra sair logo}. {leia:leia tudo antes de chamar}." },
+  { n: 2, t: "Honda HR-V EXL 1.8", y: "2017", km: "99.000", city: "Vitória, ES", p: "R$ 94.500", plate: "PPV9W21", c: "#d9d4c7",
+    d: "hrv exl com teto solar. {revisado:revisao feita mes passado}. {urgente:vendo pq vou mudar de estado}. {leilao:sem leilao sem batida}. {zap:chama no wpp}. {menor:menor valor da regiao}." },
+  { n: 2, t: "Volkswagen Saveiro Cross 1.6 CD", y: "2016", km: "121.000", city: "Ribeirão Preto, SP", p: "R$ 56.000", plate: "EKO4X88", c: "#f0b429",
+    d: "saveiro cross cabine dupla. {pneus:pneus novo}. {ar:ar gelando de mais}. {semdetalhe:zero detalhe na lataria}. {moto:pego moto de menor valor}. {oi:se ta aqui ta a venda}. {curiosos:curiosos ñ}." },
+
+  { n: 3, t: "Chevrolet Prisma LTZ 1.4", y: "2015", km: "132.000", city: "Manaus, AM", p: "R$ 41.000", plate: "NOX2L18", c: "#7b2d2d",
+    d: "Prisma LTZ. Comprei zero na concessionária e {unico:nunca passou para outro nome}. {leia:Tudo que você precisa saber está escrito aqui, não pergunte o que já está no texto}. {motor:Mecânica sem nenhum barulho, nunca foi aberto}. {pneus:Jogo de borracha trocado mês passado}. {troca:Só dinheiro, nada de carro no rolo}." },
+  { n: 3, t: "Fiat Toro Freedom 1.8", y: "2019", km: "110.000", city: "Uberlândia, MG", p: "R$ 95.000", plate: "HMB7M49", c: "#c9c3b5",
+    d: "Toro muito bem cuidada. {garagem:Nunca dormiu na rua}. {nada:Pegou, levou, está pronta pra estrada}. {fipe:Estou pedindo menos que a tabela}. {curiosos:Sem paciência pra quem só quer saber o preço e some}. {zap:Mensagem aqui eu demoro, melhor mandar no verde}." },
+  { n: 3, t: "Nissan Kicks SV 1.6 CVT", y: "2021", km: "39.000", city: "Brasília, DF", p: "R$ 102.000", plate: "PAF3N86", c: "#1f2a44",
+    d: "Kicks SV CVT. {revisado:Todas as manutenções feitas no tempo certo, carimbo no manual}. {ipva:Documento do ano já está na mão}. {semdetalhe:Pintura original, nem um amassadinho}. {leilao:Nada de batida forte, nem passou por pátio}. {urgente:Estou indo morar fora e preciso desapegar}." },
+  { n: 3, t: "Honda Fit EX 1.5 Automático", y: "2013", km: "140.000", city: "Belém, PA", p: "R$ 49.900", plate: "OTE9P27", c: "#6c7a3a",
+    d: "Fit EX automático, muito econômico. {ar:Ar ligado no 1 já congela}. {laudo:Pode levar no perito que quiser, ele passa}. {moto:Se você tem uma CG ou Fan, dá pra conversar}. {menor:Pode procurar outro igual nesse valor, não vai achar}. {oi:Se o anúncio está no ar, o carro está aqui}." },
+  { n: 3, t: "Peugeot 208 Griffe 1.6", y: "2017", km: "92.000", city: "Rio de Janeiro, RJ", p: "R$ 47.500", plate: "LRJ1Q63", c: "#ececec",
+    d: "208 Griffe com teto panorâmico. {unico:Sou a única dona desde a loja}. {motor:Motor sequinho, sem vazamento}. {leia:Antes de mandar mensagem, leia com calma tudo que escrevi}. {troca:Não quero outro carro, quero vender}. {curiosos:Quem for só olhar, por favor nem marque visita}." },
+  { n: 3, t: "Renault Duster Dynamique 1.6", y: "2018", km: "105.000", city: "João Pessoa, PB", p: "R$ 66.000", plate: "QFD6Y02", c: "#4b5d3f",
+    d: "Duster Dynamique, muito conservada. {revisado:Pasta com todas as notas de oficina}. {nada:Só abastecer e viajar}. {ipva:Licenciamento deste ano feito}. {leia:As respostas para tudo estão aqui em cima}. {fipe:Valor com desconto em cima da tabela}." },
+  { n: 3, t: "Mitsubishi L200 Triton 3.2 4x4", y: "2015", km: "190.000", city: "Chapecó, SC", p: "R$ 98.000", plate: "MKC1Z45", c: "#7d8590",
+    d: "L200 Triton 4x4 diesel. {garagem:Sempre coberta, nunca pegou sol nem chuva}. {motor:Bomba e bicos revisados, motor sem fumaça}. {leilao:Histórico limpo, nunca acionou seguro}. {troca:Negócio só no dinheiro ou pix}. {zap:Prefiro conversa pelo aplicativo do verdinho}." },
+  { n: 3, t: "Citroën C3 Tendance 1.6 Automático", y: "2014", km: "117.000", city: "Teresina, PI", p: "R$ 33.900", plate: "ODT7A63", c: "#3c6fb0",
+    d: "C3 Tendance automático. {ar:No verão daqui de Teresina ele dá conta tranquilo}. {pneus:Borracha ainda com a marquinha de nova}. {semdetalhe:Lataria lisinha, nada pra pintar}. {urgente:Preciso do dinheiro para outro projeto}. {menor:Desafio achar outro igual por esse preço}. {curiosos:Só me chame se estiver decidido}." }
+];
+const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+const $ = id => document.getElementById(id);
+let S;
+
+function parse(d) {
+  const parts = []; const re = /\{(\w+):([^}]+)\}/g; let m, last = 0;
+  while ((m = re.exec(d))) {
+    if (m.index > last) parts.push({ s: d.slice(last, m.index) });
+    parts.push({ id: m[1], s: m[2] }); last = re.lastIndex;
+  }
+  if (last < d.length) parts.push({ s: d.slice(last) });
+  return parts;
+}
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function getBest(lv) { try { return +localStorage.getItem("bcc-best-" + lv) || 0; } catch { return 0; } }
+function setBest(lv, v) { try { localStorage.setItem("bcc-best-" + lv, v); } catch {} }
+
+function newGame(lv) {
+  clearInterval(S && S.tick);
+  const ads = shuffle(ADS).map(a => ({ ...a, parts: parse(a.d) }));
+  S = { lv, ads, card: shuffle(Object.keys(PH)).slice(0, 9), marked: new Set(), found: new Set(), lines: new Set(),
+        score: 0, time: LV[lv].time, running: false, over: false, open: -1, tick: null };
+  document.querySelectorAll(".levels button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lv === lv));
+  document.body.classList.remove("reveal");
+  $("end").hidden = true;
+  toast("Clique num anúncio para abrir. O tempo começa quando você abrir o primeiro.");
+  $("feed-count").textContent = `${ADS.length} anúncios · Brasil`;
+  renderCard(); renderList(); renderStats();
+}
+
+function carSvg(color) {
+  return `<svg viewBox="0 0 240 90" aria-hidden="true">
+    <path d="M18 62 L26 44 Q30 38 40 37 L78 35 L104 16 Q110 12 120 12 L168 12 Q178 12 184 18 L204 36 Q222 38 228 48 L230 62 Z" fill="${color}" stroke="rgba(0,0,0,.35)" stroke-width="2"/>
+    <path d="M90 35 L110 19 L142 19 L142 35 Z M150 35 L150 19 L174 19 Q178 19 181 22 L194 35 Z" fill="rgba(20,30,45,.55)"/>
+    <circle cx="62" cy="64" r="16" fill="#1c1f24"/><circle cx="62" cy="64" r="7" fill="#9aa1a8"/>
+    <circle cx="186" cy="64" r="16" fill="#1c1f24"/><circle cx="186" cy="64" r="7" fill="#9aa1a8"/>
+  </svg>`;
+}
+
+function foundIn(i) { return [...S.found].filter(k => k.startsWith(i + "-")).length; }
+
+function buildDesc(i) {
+  const a = S.ads[i]; const desc = document.createElement("p"); desc.className = "desc";
+  a.parts.forEach((p, pi) => {
+    let host = desc;
+    if (p.id) {
+      host = document.createElement("span"); host.className = "occ"; host.dataset.id = p.id; host.dataset.k = i + "-" + pi;
+      if (S.found.has(host.dataset.k)) host.classList.add("found");
+      if (S.found.has(host.dataset.k) && !S.card.includes(p.id)) host.classList.add("off");
+      desc.appendChild(host);
+    }
+    p.s.split(/(\s+)/).forEach(w => {
+      if (!w) return;
+      // whitespace and lone punctuation stay plain text
+      if (/^[\s.,;:!?]+$/.test(w)) { host.appendChild(document.createTextNode(w)); return; }
+      const m = w.match(/^(.*?)([.,;:!?]*)$/);
+      const s = document.createElement("span"); s.className = "w"; s.textContent = m[1]; s.tabIndex = 0; host.appendChild(s);
+      if (m[2]) host.appendChild(document.createTextNode(m[2]));
+    });
+  });
+  return desc;
+}
+
+function renderList() {
+  const list = $("list"); list.innerHTML = "";
+  S.ads.forEach((a, i) => {
+    const open = i === S.open;
+    const el = document.createElement("article");
+    el.className = "item" + (open ? " open" : ""); el.dataset.i = i;
+    if (!open) { el.tabIndex = 0; el.setAttribute("role", "button"); el.setAttribute("aria-label", `Abrir anúncio ${a.t}`); }
+    const n = foundIn(i);
+    el.innerHTML = `
+      <div class="thumb" style="background: linear-gradient(180deg, color-mix(in srgb, ${a.c} 22%, var(--sunk)) 0 70%, var(--line) 70% 100%)">
+        <div class="plate"><b>BRASIL</b><span>${a.plate}</span></div>${carSvg(a.c)}
+        <span class="badge" ${n ? "" : "hidden"}>${n} ${n === 1 ? "achada" : "achadas"}</span>
+      </div>
+      <div class="info">
+        <div class="price">${a.p}</div>
+        <div class="title">${a.t}</div>
+        <div class="meta">${a.y} · ${a.km} km</div>
+        <div class="city">${a.city}</div>
+      </div>`;
+    if (open) {
+      const info = el.querySelector(".info");
+      const lab = document.createElement("div"); lab.className = "desc-label"; lab.textContent = "Descrição do vendedor";
+      const close = document.createElement("button"); close.className = "close"; close.textContent = "Fechar anúncio";
+      close.onclick = e => { e.stopPropagation(); S.open = -1; renderList(); };
+      info.append(lab, buildDesc(i), close);
+    }
+    list.appendChild(el);
+  });
+}
+
+function openAd(i) {
+  S.open = i; start(); renderList();
+  const el = $("list").querySelector(".item.open");
+  if (el) el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest" });
+}
+
+function renderCard() {
+  $("grid").innerHTML = S.card.map((id, i) => {
+    const inLine = [...S.lines].some(l => LINES[l].includes(i));
+    return `<div class="sq ${S.marked.has(id) ? "on" : ""} ${inLine ? "line" : ""}">${PH[id]}</div>`;
+  }).join("");
+  $("card-count").textContent = `${S.marked.size} de 9`;
+}
+
+function renderStats() {
+  $("score").textContent = S.score;
+  const m = Math.floor(S.time / 60), s = String(S.time % 60).padStart(2, "0");
+  $("timer").textContent = `${m}:${s}`;
+  $("timer-box").classList.toggle("warn", S.time <= 20 && !S.over);
+}
+
+function toast(msg, kind = "") { const t = $("toast"); t.textContent = msg; t.className = "toast " + kind; }
+
+function start() {
+  if (S.running || S.over) return;
+  S.running = true;
+  S.tick = setInterval(() => { S.time--; renderStats(); if (S.time <= 0) end(false); }, 1000);
+}
+
+function updateBadge(i) {
+  const b = $("list").querySelector(`.item[data-i="${i}"] .badge`); const n = foundIn(i);
+  if (b) { b.hidden = !n; b.textContent = `${n} ${n === 1 ? "achada" : "achadas"}`; }
+}
+
+function hit(w) {
+  if (S.over) return;
+  const occ = w.closest(".occ");
+  if (!occ) {
+    S.score = Math.max(0, S.score - LV[S.lv].miss);
+    w.classList.remove("miss"); void w.offsetWidth; w.classList.add("miss");
+    toast(`−${LV[S.lv].miss} · isso não é clichê de anúncio`, "bad");
+    renderStats(); return;
+  }
+  const k = occ.dataset.k, id = occ.dataset.id, ai = +k.split("-")[0], n = S.ads[ai].n;
+  if (S.found.has(k)) return;
+  S.found.add(k); updateBadge(ai);
+  if (!S.card.includes(id)) {
+    occ.classList.add("found", "off");
+    toast(`Clichê certo ("${PH[id]}"), mas não está na sua cartela.`);
+  } else if (S.marked.has(id)) {
+    occ.classList.add("found"); S.score += 2;
+    toast(`+2 · "${PH[id]}" de novo`, "good");
+  } else {
+    occ.classList.add("found"); S.marked.add(id); S.score += PTS[n];
+    toast(`+${PTS[n]} · ${PH[id]} (${TIER[n]})`, "good");
+    LINES.forEach((l, li) => {
+      if (!S.lines.has(li) && l.every(i => S.marked.has(S.card[i]))) { S.lines.add(li); S.score += 50; toast("BINGO! Linha fechada, +50", "big"); }
+    });
+    renderCard();
+    if (S.marked.size === 9) { S.score += 150 + S.time; renderStats(); end(true); return; }
+  }
+  renderStats();
+}
+
+function end(full) {
+  S.over = true; clearInterval(S.tick); renderStats();
+  const best = getBest(S.lv); const rec = S.score > best; if (rec) setBest(S.lv, S.score);
+  $("end").hidden = false;
+  $("end-title").textContent = full ? "Cartela cheia!" : "Acabou o tempo";
+  $("end-text").textContent = `${S.score} pontos no nível ${LV[S.lv].name}, ${S.marked.size} de 9 frases e ${S.lines.size} ${S.lines.size === 1 ? "linha" : "linhas"}. ` +
+    (rec ? "Novo recorde neste nível." : `Seu recorde: ${best}.`);
+  toast(full ? "Cartela cheia! +150 e bônus de tempo" : "Fim de jogo", full ? "big" : "");
+}
+
+$("list").addEventListener("click", e => {
+  const w = e.target.closest(".w"); if (w) { hit(w); return; }
+  const item = e.target.closest(".item"); if (item && !item.classList.contains("open")) openAd(+item.dataset.i);
+});
+$("list").addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  if (e.target.classList.contains("w")) { e.preventDefault(); hit(e.target); return; }
+  if (e.target.classList.contains("item") && !e.target.classList.contains("open")) { e.preventDefault(); openAd(+e.target.dataset.i); }
+});
+document.querySelectorAll(".levels button").forEach(b => b.onclick = () => newGame(b.dataset.lv));
+$("again").onclick = () => newGame(S.lv);
+$("reveal").onclick = () => document.body.classList.toggle("reveal");
+
+newGame("facil");
+</script>
+</body>
+</html>
