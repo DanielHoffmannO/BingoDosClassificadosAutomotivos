@@ -242,7 +242,8 @@ footer { color: var(--muted); font-size: 12px; text-align: center; }
         <h2 id="end-title">Fim de jogo</h2>
         <p id="end-text"></p>
         <div class="row">
-          <button class="btn" id="again">Jogar de novo</button>
+          <button class="btn" id="next-lv" hidden>Ir para o Médio →</button>
+          <button class="btn alt" id="again">Jogar de novo</button>
           <button class="btn alt" id="reveal">Mostrar o que faltou</button>
         </div>
       </div>
@@ -259,11 +260,11 @@ footer { color: var(--muted); font-size: 12px; text-align: center; }
     <fieldset>
       <legend>Dificuldade</legend>
         <div class="levels" role="group" aria-label="Nível">
-        <button type="button" id="lv-facil" data-lv="facil" aria-pressed="true">FÁCIL<small>clique errado −1</small></button>
-        <button type="button" id="lv-medio" data-lv="medio" aria-pressed="false">MÉDIO<small>clique errado −3</small></button>
-        <button type="button" id="lv-dificil" data-lv="dificil" aria-pressed="false">DIFÍCIL<small>clique errado −5</small></button>
+        <button type="button" id="lv-facil" data-lv="facil" aria-pressed="true">FÁCIL<small>5 min · erro −1</small></button>
+        <button type="button" id="lv-medio" data-lv="medio" aria-pressed="false">MÉDIO<small>4 min · erro −3</small></button>
+        <button type="button" id="lv-dificil" data-lv="dificil" aria-pressed="false">DIFÍCIL<small>3 min · erro −5</small></button>
     </div>
-      <p class="note">Trocar a dificuldade começa uma partida nova.</p>
+      <p class="note">No Fácil e no Médio, fechou uma linha de 3 na cartela (deitada, em pé ou na diagonal), ganhou e passa para o nível seguinte. No Difícil, o objetivo é encher a cartela. Trocar a dificuldade começa uma partida nova.</p>
     </fieldset>
     <fieldset>
       <legend><label for="src">Anúncios</label></legend>
@@ -273,18 +274,6 @@ footer { color: var(--muted); font-size: 12px; text-align: center; }
           <option value="misturados">Misturados</option>
         </select>
       <p class="note">Os reais saem dos anúncios salvos na pasta anuncios. Trocar começa uma partida nova.</p>
-    </fieldset>
-    <fieldset>
-      <legend><label for="dur">Tempo da partida</label></legend>
-      <select id="dur">
-          <option value="0">Sem tempo</option>
-          <option value="120">2 min</option>
-          <option value="180">3 min</option>
-          <option value="300" selected>5 min</option>
-          <option value="600">10 min</option>
-          <option value="900">15 min</option>
-        </select>
-      <p class="note">Dá para mudar o tempo no meio da partida. O relógio recomeça com o valor escolhido.</p>
     </fieldset>
     <button class="btn" value="ok">Pronto</button>
   </form>
@@ -307,10 +296,11 @@ const PH = {
   reparos: "Precisa de reparos", corsica: "Chevrolet Corsica", avo: "Era do meu avô", proposta: "Aceito proposta", funcionando: "Tudo funcionando",
   vendotroco: "Vendo ou troco", docok: "Doc ok, só transferir", doc_ruim: "Tem débito / não transfere", perguntas: "Sem perguntas bobas", vemnele: "Vem nele", procedencia: "Carro de procedência", parcelo: "Parcelo na promissória", temleilao: "Tem passagem por leilão"
 };
+// each level sets the clock and the wrong-click penalty; Fácil and Médio are won with one bingo line (row, column or diagonal)
 const LV = {
-  facil: { name: "Fácil", miss: 1 },
-  medio: { name: "Médio", miss: 3 },
-  dificil: { name: "Difícil", miss: 5 }
+  facil: { name: "Fácil", time: 300, miss: 1, next: "medio" },
+  medio: { name: "Médio", time: 240, miss: 3, next: "dificil" },
+  dificil: { name: "Difícil", time: 180, miss: 5, next: null }
 };
 const PTS = { 1: 10, 2: 20, 3: 30 };
 const TIER = { 1: "certinha", 2: "com erro", 3: "disfarçada" };
@@ -588,7 +578,7 @@ function newGame(lv) {
   const present = [...new Set(ads.flatMap(a => [...a.parts, ...a.tparts].filter(p => p.id).map(p => p.id)).concat(ads.some(a => a.dedo) ? ["dedo"] : []))];
   const card = shuffle(present).slice(0, 9).concat(shuffle(Object.keys(PH).filter(k => !present.includes(k)))).slice(0, 9);
   S = { lv, ads, card, marked: new Set(), found: new Set(), lines: new Set(),
-        score: 0, limit: +$("dur").value, time: +$("dur").value, running: false, paused: false, over: false, open: -1, seen: new Set(), tick: null };
+        score: 0, limit: LV[lv].time, time: LV[lv].time, running: false, paused: false, over: false, open: -1, seen: new Set(), tick: null };
   document.querySelectorAll(".levels button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lv === lv));
   document.body.classList.remove("reveal", "paused");
   $("pause").textContent = "Pausar"; $("pause").disabled = true;
@@ -695,8 +685,8 @@ function renderCard() {
 }
 
 function renderSummary() {
-  const v = +$("dur").value;
-  $("cfg-summary").textContent = `${LV[S.lv].name} · ${v ? v / 60 + " min" : "sem tempo"}`;
+  const L = LV[S.lv];
+  $("cfg-summary").textContent = `${L.name} · ${L.time / 60} min · erro −${L.miss}`;
 }
 
 function renderStats() {
@@ -722,11 +712,6 @@ function togglePause() {
   tickOn();
 }
 
-function setDuration(v) {
-  S.limit = v; S.time = v;
-  toast(v ? `Cronômetro em ${v / 60} min.` : "Sem cronômetro. Jogue no seu ritmo.");
-  tickOn(); renderStats();
-}
 
 function toast(msg, kind = "") { const t = $("toast"); t.textContent = msg; t.className = "toast " + kind; }
 
@@ -766,19 +751,25 @@ function hit(w) {
       if (!S.lines.has(li) && l.every(i => S.marked.has(S.card[i]))) { S.lines.add(li); S.score += 50; toast("BINGO! Linha fechada, +50", "big"); }
     });
     renderCard();
-    if (S.marked.size === 9) { S.score += 150 + (S.limit ? S.time : 0); renderStats(); end(true); return; }
+    if (S.marked.size === 9) { S.score += 150 + (S.limit ? S.time : 0); renderStats(); end("full"); return; }
+    if (LV[S.lv].next && S.lines.size > 0) { S.bonus = Math.round(S.time / 5); S.score += S.bonus; renderStats(); end("win"); return; }
   }
   renderStats();
 }
 
-function end(full) {
+function end(kind) {
+  const full = kind === "full", won = kind === "win" || (full && LV[S.lv].next);
   S.over = true; clearInterval(S.tick); $("pause").disabled = true; renderStats();
   const best = getBest(S.lv); const rec = S.score > best; if (rec) setBest(S.lv, S.score);
   $("end").hidden = false;
-  $("end-title").textContent = full ? "Cartela cheia!" : "Acabou o tempo";
+  const nx = LV[S.lv].next;
+  $("next-lv").hidden = !(won && nx);
+  if (won && nx) $("next-lv").textContent = `Ir para o ${LV[nx].name} →`;
+  $("again").textContent = won && nx ? "Repetir este nível" : "Jogar de novo";
+  $("end-title").textContent = full ? "Cartela cheia!" : won ? `Passou do ${LV[S.lv].name}!` : "Acabou o tempo";
   $("end-text").textContent = `${S.score} pontos no nível ${LV[S.lv].name}, ${S.marked.size} de 9 frases e ${S.lines.size} ${S.lines.size === 1 ? "linha" : "linhas"}. ` +
     (rec ? "Novo recorde neste nível." : `Seu recorde: ${best}.`);
-  toast(full ? "Cartela cheia! +150 e bônus de tempo" : "Fim de jogo", full ? "big" : "");
+  toast(full ? "Cartela cheia! +150 e bônus de tempo" : won ? `BINGO! Linha fechada, +50 e +${S.bonus} pelo tempo que sobrou` : "Fim de jogo", full || won ? "big" : "");
 }
 
 $("list").addEventListener("click", e => {
@@ -792,6 +783,7 @@ $("list").addEventListener("keydown", e => {
 });
 document.querySelectorAll(".levels button").forEach(b => b.onclick = () => newGame(b.dataset.lv));
 $("again").onclick = () => newGame(S.lv);
+$("next-lv").onclick = () => { if (LV[S.lv].next) newGame(LV[S.lv].next); };
 $("pause").onclick = togglePause;
 function isDark() {
   const t = document.documentElement.dataset.theme;
@@ -818,7 +810,6 @@ $("settings").addEventListener("close", () => {
   if (autoPaused && S.paused && !S.over) togglePause();
   autoPaused = false;
 });
-$("dur").onchange = e => setDuration(+e.target.value);
 $("src").onchange = () => newGame(S.lv);
 $("reveal").onclick = () => document.body.classList.toggle("reveal");
 
