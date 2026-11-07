@@ -6,7 +6,7 @@ let PH = {}, ANUNCIOS = [];
 const LV = {
   facil: { name: "Fácil", time: 300, miss: 1, win: "any", hint: true, next: "medio" },
   medio: { name: "Médio", time: 240, miss: 3, win: "any", next: "dificil" },
-  dificil: { name: "Difícil", time: 180, miss: 5, win: "full", gain: true, next: null }
+  dificil: { name: "Difícil", time: 180, miss: 5, win: "full", gain: true, hard: true, next: null }
 };
 // lines = how many of LINES count (the first 6 are rows and columns, the last 2 diagonals); need = lines to win
 const WIN = { row: { lines: 6, need: 1 }, any: { lines: 8, need: 1 }, two: { lines: 8, need: 2 }, full: { lines: 8, need: Infinity } };
@@ -26,13 +26,23 @@ const PTS = { 1: 10, 2: 20, 3: 30 };
 const GAIN = { 1: 10, 2: 15, 3: 20 };
 const TIER = { 1: "certinha", 2: "com erro", 3: "disfarçada" };
 const PER_GAME = 24; // ads per game when the level doesn't say
+// tier of each cliché occurrence: the {id~N:...} mark wins, then the ad's own n, then 1
+function tierOf(p, a) { return p.n || a.n || 1; }
+// true when the ad has at least one phrase written with a typo, slang or in disguise
+function isHard(a) { return [...parse(a.d), ...parse(a.t)].some(p => p.id && tierOf(p, a) >= 2); }
+// with hard on (Difícil), up to half of the ads drawn are ones with hard phrases
+function draw(pool, n, hard) {
+  if (!hard) return shuffle(pool).slice(0, n);
+  const h = shuffle(pool.filter(isHard)).slice(0, Math.ceil(n / 2));
+  return h.concat(shuffle(pool.filter(a => !h.includes(a))).slice(0, n - h.length));
+}
 // "reais" / "inventados" take only that kind; "misturados" takes half of each
-function pickAds(src, per) {
+function pickAds(src, per, hard) {
   const real = ANUNCIOS.filter(a => a.real), fake = ANUNCIOS.filter(a => !a.real);
   const n = per || (src === "inventados" ? fake.length : PER_GAME);
-  if (src === "inventados") return shuffle(fake).slice(0, n);
-  if (src === "reais") return shuffle(real).slice(0, n);
-  return shuffle(fake).slice(0, Math.ceil(n / 2)).concat(shuffle(real).slice(0, Math.floor(n / 2)));
+  if (src === "inventados") return draw(fake, n, hard);
+  if (src === "reais") return draw(real, n, hard);
+  return draw(fake, Math.ceil(n / 2), hard).concat(draw(real, Math.floor(n / 2), hard));
 }
 const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 const $ = id => document.getElementById(id);
@@ -57,7 +67,7 @@ function newGame(lv) {
   clearInterval(S && S.tick);
   const src = $("src").value;
   const L = levelCfg(lv);
-  const ads = shuffle(pickAds(src, L.ads)).map(a => {
+  const ads = shuffle(pickAds(src, L.ads, L.hard)).map(a => {
     const parts = parse(a.d), tparts = parse(a.t);
     // ids = the card phrases this ad holds; "dedo" is the finger over the plate in the photo
     const ids = [...new Set([...parts, ...tparts].filter(p => p.id).map(p => p.id).concat(a.dedo ? ["dedo"] : []))];
@@ -65,7 +75,15 @@ function newGame(lv) {
   });
   // the card only asks for phrases that show up in this game's ads
   const present = [...new Set(ads.flatMap(a => a.ids))];
-  const card = shuffle(present).slice(0, 9).concat(shuffle(Object.keys(PH).filter(k => !present.includes(k)))).slice(0, 9);
+  // Difícil puts up to 6 phrases on the card that only show up with a typo, slang or in disguise
+  let first = [];
+  if (L.hard) {
+    const top = {};
+    ads.forEach(a => a.parts.concat(a.tparts).forEach(p => { if (p.id) top[p.id] = Math.max(top[p.id] || 0, tierOf(p, a)); }));
+    first = shuffle(present.filter(id => top[id] >= 2)).slice(0, 6);
+  }
+  const card = shuffle(first.concat(shuffle(present.filter(id => !first.includes(id))))
+    .slice(0, 9).concat(shuffle(Object.keys(PH).filter(k => !present.includes(k)))).slice(0, 9));
   S = { lv, ads, card, marked: new Set(), found: new Set(), lines: new Set(),
         L, score: 0, time: L.time, running: false, paused: false, over: false, open: -1, seen: new Set(), tick: null };
   document.querySelectorAll(".levels button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lv === lv));
@@ -192,6 +210,18 @@ function renderCard() {
     return `<div class="sq ${S.marked.has(id) ? "on" : ""} ${inLine ? "line" : ""}">${PH[id]}</div>`;
   }).join("");
   $("card-count").textContent = `${S.marked.size} de 9`;
+  renderMini();
+}
+
+// phone-only bar fixed at the bottom: a tiny 3x3 of the card, the clock and the score.
+// Tapping it opens the full card above the bar, so the player doesn't scroll back to the top.
+function renderMini() {
+  $("mini-grid").innerHTML = S.card.map(id => `<i class="${S.marked.has(id) ? "on" : ""}"></i>`).join("");
+  $("mini-sheet").innerHTML = S.card.map((id, i) => {
+    const inLine = [...S.lines].some(l => LINES[l].includes(i));
+    return `<div class="sq ${S.marked.has(id) ? "on" : ""} ${inLine ? "line" : ""}">${PH[id]}</div>`;
+  }).join("");
+  $("mini-count").textContent = `${S.marked.size} de 9`;
 }
 
 function renderSummary() {
@@ -200,9 +230,10 @@ function renderSummary() {
 }
 
 function renderStats() {
-  $("score").textContent = S.score;
+  $("score").textContent = S.score; $("mini-score").textContent = `${S.score} pts`;
   const m = Math.floor(S.time / 60), s = String(S.time % 60).padStart(2, "0");
-  $("timer").textContent = S.L.time ? `${m}:${s}` : "Livre";
+  $("timer").textContent = $("mini-time").textContent = S.L.time ? `${m}:${s}` : "Livre";
+  $("mini").classList.toggle("warn", S.L.time > 0 && S.time <= 20 && !S.over);
   $("timer-box").classList.toggle("warn", S.L.time > 0 && S.time <= 20 && !S.over);
 }
 
@@ -283,6 +314,7 @@ function end(kind) {
   if (won && nx) $("next-lv").textContent = `Ir para o ${LV[nx].name} →`;
   $("again").textContent = won && nx ? "Repetir este nível" : "Jogar de novo";
   $("end-title").textContent = full ? "Cartela cheia!" : won ? (nx ? `Passou do ${S.L.name}!` : "Você ganhou!") : "Acabou o tempo";
+  $("share").textContent = "Compartilhar resultado";
   $("end-text").textContent = `${S.score} pontos no nível ${S.L.name}, ${S.marked.size} de 9 frases e ${plural(S.lines.size, "linha", "linhas")}. ` +
     (rec ? "Novo recorde neste nível." : `Seu recorde: ${best}.`);
   toast(full ? `+150 pela cartela${S.time ? ` e +${S.time} pelo tempo que sobrou` : ""}` : won ? `BINGO! +50, e +${S.bonus} pelo tempo que sobrou` : "Hoje não saiu negócio. Bora de novo?", full || won ? "big" : "");
@@ -299,6 +331,22 @@ $("list").addEventListener("keydown", e => {
 });
 document.querySelectorAll(".levels button").forEach(b => b.onclick = () => newGame(b.dataset.lv));
 $("again").onclick = () => newGame(S.lv);
+// result text with the card drawn in emoji, like the word games people post in group chats
+function shareText() {
+  const rows = [0, 3, 6].map(r => S.card.slice(r, r + 3).map(id => S.marked.has(id) ? "🟨" : "⬛").join("")).join("\n");
+  return `Bingo dos Classificados Automotivos\n${S.score} pontos no ${S.L.name}, ${S.marked.size} de 9 frases\n${rows}\n${location.href.split("#")[0].split("?")[0]}`;
+}
+$("share").onclick = async () => {
+  const text = shareText();
+  try {
+    if (navigator.share) { await navigator.share({ text }); return; }
+    await navigator.clipboard.writeText(text);
+    $("share").textContent = "Copiado! Agora é só colar";
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+    window.prompt("Copie o resultado:", text);
+  }
+};
 $("next-lv").onclick = () => { if (S.L.next) newGame(S.L.next); };
 // custom rules are remembered in this browser; changing one starts a new custom game
 try { const c = JSON.parse(load("bcc-custom") || "{}"); for (const k in CUSTOM_KEYS) if (k in c) { const el = $(CUSTOM_KEYS[k]); if (el.type === "checkbox") el.checked = !!c[k]; else el.value = c[k]; } } catch {}
@@ -307,6 +355,24 @@ Object.values(CUSTOM_KEYS).forEach(id => $(id).addEventListener("change", () => 
   newGame("custom");
 }));
 $("pause").onclick = togglePause;
+$("mini-open").onclick = () => {
+  const open = $("mini").classList.toggle("open");
+  $("mini-open").setAttribute("aria-expanded", open);
+  $("mini-open").querySelector("small").textContent = open ? "Fechar cartela" : "Ver cartela";
+};
+// "Como jogar" opens by itself on the first visit; the ? button opens it again
+let howPaused = false;
+function openHow() {
+  howPaused = !!S && S.running && !S.paused && !S.over;
+  if (howPaused) togglePause();
+  $("how").showModal();
+}
+$("how-btn").onclick = openHow;
+$("how").addEventListener("close", () => {
+  save("bcc-howto", "1");
+  if (howPaused && S.paused && !S.over) togglePause();
+  howPaused = false;
+});
 function isDark() {
   const t = document.documentElement.dataset.theme;
   return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
@@ -344,7 +410,7 @@ $("reveal").onclick = () => {
 
 // the data comes from JSON files, which the browser only loads from a web server (GitHub Pages or a local one)
 Promise.all(["dados/cliches.json", "dados/anuncios.json"].map(f => fetch(f).then(r => { if (!r.ok) throw r.status; return r.json(); })))
-  .then(([ph, ads]) => { PH = ph; ANUNCIOS = ads; newGame("medio"); })
+  .then(([ph, ads]) => { PH = ph; ANUNCIOS = ads; newGame("medio"); if (!load("bcc-howto")) openHow(); })
   .catch(() => {
     $("list").innerHTML = `<p class="load-error">Não deu para carregar os anúncios. Se você abriu o index.html direto do computador, rode <code>python3 -m http.server</code> nesta pasta e abra <code>http://localhost:8000</code>.</p>`;
   });

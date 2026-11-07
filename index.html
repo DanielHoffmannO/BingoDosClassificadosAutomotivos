@@ -4,6 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bingo dos Classificados Automotivos</title>
+<meta name="description" content="Único dono, só pegar e andar, leia o anúncio até o final: ache os clichês dos anúncios de carro e feche a cartela.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#f2c230">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:title" content="Bingo dos Classificados Automotivos">
+<meta property="og:description" content="Único dono, só pegar e andar, leia o anúncio até o final: ache os clichês dos anúncios de carro e feche a cartela.">
+<meta property="og:url" content="https://danielhoffmanno.github.io/BingoDosClassificadosAutomotivos/">
+<meta property="og:image" content="https://danielhoffmanno.github.io/BingoDosClassificadosAutomotivos/previa.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="claude:viewport-fit-sides" content="cover">
 <script>try { var t = localStorage.getItem("bcc-theme"); if (t === "dark" || t === "light") document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -41,6 +53,7 @@
           <span>Configurações</span><small id="cfg-summary">Médio · 4 min</small>
         </button>
         <button class="btn alt" id="pause" disabled>Pausar</button>
+        <button class="btn alt theme-btn how-btn" id="how-btn" aria-label="Como jogar" title="Como jogar"><span aria-hidden="true">?</span></button>
         <button class="btn alt theme-btn" id="theme-btn" aria-label="Mudar tema" title="Mudar tema">
           <svg class="i-moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M20.7 14.3A8.5 8.5 0 0 1 9.7 3.3a8.5 8.5 0 1 0 11 11z"/></svg>
           <svg class="i-sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
@@ -58,6 +71,7 @@
           <button class="btn" id="next-lv" hidden>Ir para o Médio →</button>
           <button class="btn alt" id="again">Jogar de novo</button>
           <button class="btn alt" id="reveal">Mostrar o que faltou</button>
+          <button class="btn alt" id="share">Compartilhar resultado</button>
         </div>
       </div>
       <p class="hint"><strong>Pontos:</strong> frase escrita certinha vale 10, com erro ou gíria 20, disfarçada 30, e linha fechada +50. Vale clicar em qualquer palavra da frase, e o dedo tampando a placa na foto também conta. Clicar no que não é clichê tira ponto.</p>
@@ -66,6 +80,31 @@
 
   <footer>Os anúncios reais estão do jeito que o vendedor escreveu, com erro e tudo. Os inventados só imitam.</footer>
 </div>
+
+<div class="mini" id="mini">
+  <div class="mini-sheet" id="mini-sheet"></div>
+  <button class="mini-bar" id="mini-open" aria-expanded="false" aria-controls="mini-sheet">
+    <span class="mini-grid" id="mini-grid" aria-hidden="true"></span>
+    <span class="mini-txt"><strong id="mini-count">0 de 9</strong><small>Ver cartela</small></span>
+    <span class="mini-stat" id="mini-time">4:00</span>
+    <span class="mini-stat" id="mini-score">0 pts</span>
+  </button>
+</div>
+
+<dialog id="how" aria-labelledby="how-title">
+  <form method="dialog" class="settings">
+    <h2 id="how-title">Como jogar</h2>
+    <ol class="how">
+      <li><strong>Abra um anúncio.</strong> O relógio só começa a andar depois disso.</li>
+      <li><strong>Leia a descrição e clique nos clichês</strong> que estão na sua cartela, como "único dono" ou "dispensa curiosos". Vale clicar em qualquer palavra da frase.</li>
+      <li><strong>Atenção ao jeito que está escrito:</strong> frase certinha vale 10, com erro ou gíria vale 20, disfarçada vale 30.</li>
+      <li><strong>Feche uma linha</strong> (deitada, em pé ou na diagonal) para ganhar +50 e passar de nível. No Difícil só vale cartela cheia.</li>
+      <li><strong>Cuidado:</strong> clicar no que não é clichê tira ponto.</li>
+    </ol>
+    <p class="note">No celular, a barra de baixo mostra a cartela, o tempo e os pontos. Toque nela para ver as frases.</p>
+    <button class="btn" value="ok">Bora jogar</button>
+  </form>
+</dialog>
 
 <dialog id="settings" aria-labelledby="settings-title">
   <form method="dialog" class="settings">
@@ -121,7 +160,6 @@
   </form>
 </dialog>
 
-<script src="js/dados.js"></script>
 <script src="js/jogo.js"></script>
 </body>
 </html>
