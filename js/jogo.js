@@ -115,6 +115,15 @@ function occClasses(id, k) {
   return ["occ", f && "found", f && !S.card.includes(id) && "off", isMissed(id) && "missed"].filter(Boolean).join(" ");
 }
 
+// Pixel art mode: same photo, pixelated copy in fotos-pixel/ (hides plates, faces and places)
+let pixelMode = load("bcc-pixel") === "1";
+function fotoSrc(f) { return pixelMode ? f.replace("fotos/", "fotos-pixel/").replace(/\.jpg$/, ".png") : f; }
+function labelPixel() {
+  document.documentElement.classList.toggle("pixel", pixelMode);
+  const b = $("pixel-btn"); if (!b) return;
+  b.setAttribute("aria-pressed", pixelMode); b.title = pixelMode ? "Voltar para foto normal" : "Ver fotos em pixel art";
+}
+
 function plateHtml(a, i) {
   if (!a.plate) return "";
   const inner = `<b>BRASIL</b><span>${a.plate}</span>${a.dedo ? '<i class="finger" aria-hidden="true"></i>' : ""}`;
@@ -171,7 +180,7 @@ function adEl(a, i, open) {
       <div class="thumb" style="background: linear-gradient(180deg, color-mix(in srgb, ${a.c || "#8a8f96"} 22%, var(--sunk)) 0 70%, var(--line) 70% 100%)">
         ${S.L.hint && miss.length ? `<span class="hint-tag">${miss.length} da cartela</span>` : ""}
         ${miss.length ? `<span class="miss-tag">Faltou aqui: ${miss.map(id => PH[id]).join(" · ")}</span>` : ""}
-        ${plateHtml(a, i)}${carSvg(a.c || "#8a8f96")}${a.foto ? `<img class="photo" src="${a.foto}" alt="" loading="lazy" onerror="this.remove()">` : ""}
+        ${plateHtml(a, i)}${carSvg(a.c || "#8a8f96")}${a.foto ? `<img class="photo" data-foto="${a.foto}" src="${fotoSrc(a.foto)}" alt="" loading="lazy" onerror="this.remove()">` : ""}
         <span class="seen-tag" ${S.seen.has(i) ? "" : "hidden"}><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>Visto</span>
         <span class="badge" ${n ? "" : "hidden"}>${plural(n, "achada", "achadas")}</span>
       </div>
@@ -431,6 +440,11 @@ $("theme-btn").onclick = () => {
   labelTheme();
 };
 labelTheme();
+$("pixel-btn").onclick = () => {
+  pixelMode = !pixelMode; save("bcc-pixel", pixelMode ? "1" : "0"); labelPixel();
+  document.querySelectorAll("img.photo[data-foto]").forEach(img => { img.src = fotoSrc(img.dataset.foto); });
+};
+labelPixel();
 let autoPaused = false;
 $("settings-btn").onclick = () => {
   autoPaused = !!S && S.running && !S.paused && !S.over;

@@ -149,8 +149,8 @@ header { display: flex; flex-wrap: wrap; align-items: end; justify-content: spac
 .stat label { display: block; }
 .stat output { display: block; font-family: var(--display); font-weight: 900; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .stat.warn output { color: var(--bad); }
-/* Configurações gets its own row so its summary never gets squeezed; Pausar, ? and the theme button share the row below */
-.tools { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
+/* Configurações gets its own row so its summary never gets squeezed; Pausar, ?, pixel art and the theme button share the row below */
+.tools { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 8px; }
 .tools .cfg { grid-column: 1 / -1; }
 .tools .btn { padding: 10px 14px; min-width: 84px; }
 .tools .theme-btn { min-width: 0; padding: 10px 12px; display: grid; place-items: center; }
@@ -237,3 +237,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; }
   .mini-stat { font-family: var(--display); font-weight: 900; font-size: 18px; font-variant-numeric: tabular-nums; }
   .mini.warn #mini-time { color: var(--bad); }
 }
+
+/* Pixel art photos: tiny PNGs scaled up without smoothing */
+.pixel .thumb img.photo { image-rendering: pixelated; }
+#pixel-btn[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
