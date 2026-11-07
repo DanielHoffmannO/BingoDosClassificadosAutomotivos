@@ -215,6 +215,45 @@ function renderCard() {
 
 // phone-only bar fixed at the bottom: a tiny 3x3 of the card, the clock and the score.
 // Tapping it opens the full card above the bar, so the player doesn't scroll back to the top.
+// --- party when a line closes: the squares of the line pop one after the other, confetti falls over the card
+function celebrate(lines, full) {
+  play(full ? "full" : "line");
+  const cells = [...new Set(lines.flatMap(li => LINES[li]))];
+  ["grid", "mini-sheet"].forEach(g => cells.forEach((c, k) => {
+    const sq = $(g).children[c]; if (sq) { sq.style.setProperty("--k", k); sq.classList.add("pop"); }
+  }));
+  const card = document.querySelector(".card");
+  card.classList.remove("bingo"); void card.offsetWidth; card.classList.add("bingo");
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const colors = ["#f2c230", "#e8553f", "#3d7be0", "#2fbf71", "#ffffff"];
+  for (let n = 0; n < (full ? 70 : 36); n++) {
+    const p = document.createElement("i"); p.className = "confetti";
+    p.style.cssText = `left:${Math.random() * 100}%;background:${colors[n % colors.length]};--dx:${(Math.random() - .5) * 120}px;--rot:${Math.random() * 720 - 360}deg;animation-delay:${Math.random() * .25}s`;
+    card.appendChild(p); setTimeout(() => p.remove(), 1700);
+  }
+}
+
+// --- sounds: short tunes made with Web Audio (no sound files); can be turned off in Configurações
+let actx = null;
+function play(kind) {
+  if (!$("snd").checked) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+    const t = actx.currentTime;
+    const tone = (f, at, dur, type = "triangle", vol = .16) => {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type; o.frequency.value = f; o.connect(g); g.connect(actx.destination);
+      g.gain.setValueAtTime(0, t + at); g.gain.linearRampToValueAtTime(vol, t + at + .01); g.gain.exponentialRampToValueAtTime(.001, t + at + dur);
+      o.start(t + at); o.stop(t + at + dur + .02);
+    };
+    if (kind === "hit") tone(880, 0, .12, "sine", .08);
+    else if (kind === "miss") tone(150, 0, .2, "square", .05);
+    else if (kind === "line") [523, 659, 784, 1047].forEach((f, k) => tone(f, k * .09, .28));
+    else if (kind === "full") [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, k) => tone(f, k * .11, k === 6 ? .7 : .3));
+  } catch {}
+}
+
 function renderMini() {
   $("mini-grid").innerHTML = S.card.map(id => `<i class="${S.marked.has(id) ? "on" : ""}"></i>`).join("");
   $("mini-sheet").innerHTML = S.card.map((id, i) => {
@@ -276,7 +315,7 @@ function hit(w) {
   const occ = w.closest(".occ");
   if (!occ) {
     S.score = Math.max(0, S.score - S.L.miss);
-    w.classList.remove("miss"); void w.offsetWidth; w.classList.add("miss");
+    w.classList.remove("miss"); void w.offsetWidth; w.classList.add("miss"); play("miss");
     toast(S.L.miss ? `−${S.L.miss} · isso aí não é clichê` : "Isso aí não é clichê", "bad");
     renderStats(); return;
   }
@@ -294,10 +333,12 @@ function hit(w) {
     const g = S.L.gain && S.L.time ? GAIN[n] : 0;
     if (g) { S.time += g; showGain(g); }
     toast(`+${PTS[n]} · ${PH[id]} (${TIER[n]})${g ? ` · +${g} s no relógio` : ""}`, "good");
+    const fresh = [];
     LINES.forEach((l, li) => {
-      if (!S.lines.has(li) && l.every(i => S.marked.has(S.card[i]))) { S.lines.add(li); S.score += 50; toast("BINGO! +50", "big"); }
+      if (!S.lines.has(li) && l.every(i => S.marked.has(S.card[i]))) { S.lines.add(li); fresh.push(li); S.score += 50; toast("BINGO! +50", "big"); }
     });
     renderCard();
+    if (fresh.length) celebrate(fresh, S.marked.size === 9); else play("hit");
     if (S.marked.size === 9) { S.score += 150 + S.time; renderStats(); end("full"); return; }
     if (hasWon()) { S.bonus = Math.round(S.time / 5); S.score += S.bonus; renderStats(); end("win"); return; }
   }
@@ -349,6 +390,8 @@ $("share").onclick = async () => {
 };
 $("next-lv").onclick = () => { if (S.L.next) newGame(S.L.next); };
 // custom rules are remembered in this browser; changing one starts a new custom game
+$("snd").checked = load("bcc-som") !== "0";
+$("snd").onchange = () => save("bcc-som", $("snd").checked ? "1" : "0");
 try { const c = JSON.parse(load("bcc-custom") || "{}"); for (const k in CUSTOM_KEYS) if (k in c) { const el = $(CUSTOM_KEYS[k]); if (el.type === "checkbox") el.checked = !!c[k]; else el.value = c[k]; } } catch {}
 Object.values(CUSTOM_KEYS).forEach(id => $(id).addEventListener("change", () => {
   save("bcc-custom", JSON.stringify(readCustom()));
