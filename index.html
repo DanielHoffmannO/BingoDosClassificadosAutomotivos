@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bingo dos Classificados Automotivos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<script>try { var t = localStorage.getItem("bcc-theme"); if (t === "dark" || t === "light") document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Bingo dos <span>Classificados</span> Automotivos</h1>
+      <p>Único dono, só pegar e andar, leia o anúncio até o final: todo vendedor de carro escreve igual. Ache nos anúncios as frases da sua cartela e feche uma linha.</p>
+    </div>
+  </header>
+
+  <div class="game">
+    <section class="feed">
+      <div class="feed-head">
+        <h2>Carros à venda</h2>
+        <span id="feed-count"></span>
+      </div>
+      <div class="list" id="list"></div>
+    </section>
+
+    <aside class="side">
+      <div class="score">
+        <div class="stat"><label>Pontos</label><output id="score">0</output></div>
+        <div class="stat" id="timer-box"><label>Tempo</label><output id="timer">4:00</output><span class="gain" id="gain" aria-hidden="true"></span></div>
+      </div>
+      <div class="tools">
+        <button class="btn alt cfg" id="settings-btn" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.4-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.7a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.4L6.5 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.4 2.5-1c.5.4 1.1.7 1.7 1l.4 2.7h4l.4-2.7c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>
+          <span>Configurações</span><small id="cfg-summary">Médio · 4 min</small>
+        </button>
+        <button class="btn alt" id="pause" disabled>Pausar</button>
+        <button class="btn alt theme-btn" id="theme-btn" aria-label="Mudar tema" title="Mudar tema">
+          <svg class="i-moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M20.7 14.3A8.5 8.5 0 0 1 9.7 3.3a8.5 8.5 0 1 0 11 11z"/></svg>
+          <svg class="i-sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-head"><strong>Cartela</strong><span id="card-count">0 de 9</span></div>
+        <div class="grid" id="grid"></div>
+      </div>
+      <div class="toast" id="toast">Abra um anúncio para começar. O relógio só anda depois disso.</div>
+      <div class="end" id="end" hidden>
+        <h2 id="end-title">Fim de jogo</h2>
+        <p id="end-text"></p>
+        <div class="row">
+          <button class="btn" id="next-lv" hidden>Ir para o Médio →</button>
+          <button class="btn alt" id="again">Jogar de novo</button>
+          <button class="btn alt" id="reveal">Mostrar o que faltou</button>
+        </div>
+      </div>
+      <p class="hint"><strong>Pontos:</strong> frase escrita certinha vale 10, com erro ou gíria 20, disfarçada 30, e linha fechada +50. Vale clicar em qualquer palavra da frase, e o dedo tampando a placa na foto também conta. Clicar no que não é clichê tira ponto.</p>
+    </aside>
+  </div>
+
+  <footer>Os anúncios reais estão do jeito que o vendedor escreveu, com erro e tudo. Os inventados só imitam.</footer>
+</div>
+
+<dialog id="settings" aria-labelledby="settings-title">
+  <form method="dialog" class="settings">
+    <h2 id="settings-title">Configurações</h2>
+    <fieldset>
+      <legend>Dificuldade</legend>
+        <div class="levels" role="group" aria-label="Nível">
+        <button type="button" id="lv-facil" data-lv="facil" aria-pressed="false">FÁCIL<small>5 min · erro −1 · com dica</small></button>
+        <button type="button" id="lv-medio" data-lv="medio" aria-pressed="true">MÉDIO<small>4 min · erro −3</small></button>
+        <button type="button" id="lv-dificil" data-lv="dificil" aria-pressed="false">DIFÍCIL<small>3 min · acerto dá tempo</small></button>
+        <button type="button" id="lv-custom" data-lv="custom" aria-pressed="false">PERSONALIZADA<small>do seu jeito</small></button>
+    </div>
+      <div class="custom" id="custom" hidden>
+        <label for="c-time">Tempo
+          <select id="c-time">
+            <option value="0">Sem tempo</option><option value="120">2 min</option><option value="180">3 min</option>
+            <option value="300" selected>5 min</option><option value="600">10 min</option><option value="900">15 min</option>
+          </select>
+        </label>
+        <label for="c-win">Para ganhar
+          <select id="c-win">
+            <option value="row">1 linha deitada ou em pé</option>
+            <option value="any" selected>1 linha, vale diagonal</option>
+            <option value="two">2 linhas, vale diagonal</option>
+            <option value="full">Cartela cheia</option>
+          </select>
+        </label>
+        <label for="c-miss">Clique errado
+          <select id="c-miss">
+            <option value="0">Não tira ponto</option><option value="1" selected>−1</option><option value="3">−3</option><option value="5">−5</option><option value="10">−10</option>
+          </select>
+        </label>
+        <label for="c-ads">Anúncios na tela
+          <select id="c-ads">
+            <option value="12">12</option><option value="24" selected>24</option><option value="36">36</option>
+          </select>
+        </label>
+        <label class="check" for="c-hint"><input type="checkbox" id="c-hint"> Dica: mostrar quantas frases da cartela cada anúncio tem</label>
+      </div>
+      <p class="note">Fácil e Médio: fechou uma linha (vale diagonal), sobe de nível. O Fácil mostra quantas frases da cartela cada anúncio tem. Difícil: só vale cartela cheia, e cada frase achada devolve tempo (+10 s, +15 s com erro, +20 s disfarçada). Personalizada: as regras são suas.</p>
+    </fieldset>
+    <fieldset>
+      <legend><label for="src">Anúncios</label></legend>
+      <select id="src">
+          <option value="reais" selected>Reais do Marketplace</option>
+          <option value="inventados">Inventados</option>
+          <option value="misturados">Misturados</option>
+        </select>
+      <p class="note">Os reais foram copiados do Marketplace, sem nomes e telefones.</p>
+    </fieldset>
+    <p class="note">Mudar qualquer coisa aqui começa uma partida nova.</p>
+    <button class="btn" value="ok">Pronto</button>
+  </form>
+</dialog>
+
+<script src="js/dados.js"></script>
+<script src="js/jogo.js"></script>
+</body>
+</html>
